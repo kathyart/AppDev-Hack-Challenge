@@ -127,5 +127,89 @@ def delete_outfit(outfit_id):
 
 
 
+@app.route("/users/", methods=["GET"])
+def get_all_users():
+    # get all users
+    users = User.query.all()
+
+    # return serialized users
+    return success_response({"users": [user.serialize() for user in users]})
+
+
+@app.route("/users/<int:user_id>/", methods=["GET"])
+def get_user_by_user_id(user_id):
+    # get user by id
+    user = User.query.filter_by(id=user_id).first()
+
+    # check if user exists
+    if user is None:
+        return failure_response("User not found")
+
+    # return serialized user
+    return success_response(user.serialize())
+
+
+@app.route("/users/", methods=["POST"])
+def create_user():
+    # get request body
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    # get required and optional fields
+    name = body.get("name")
+    netid = body.get("netid")
+    bio = body.get("bio", "")
+
+    # check required fields
+    if not name or not netid:
+        return failure_response("Missing required fields: name and netid", 400)
+
+    # check if netid already exists
+    existing_user = User.query.filter_by(netid=netid).first()
+    if existing_user is not None:
+        return failure_response("User with this netid already exists", 400)
+
+    # create new user
+    new_user = User(name=name, netid=netid, bio=bio)
+    db.session.add(new_user)
+    db.session.commit()
+
+    # return created user
+    return success_response(new_user.serialize(), 201)
+
+
+@app.route("/users/<int:user_id>/outfits/", methods=["GET"])
+def get_outfits_by_user_id(user_id):
+    # get user by id
+    user = User.query.filter_by(id=user_id).first()
+
+    # check if user exists
+    if user is None:
+        return failure_response("User not found")
+
+    # get user's outfits, newest first
+    outfits = Outfit.query.filter_by(user_id=user_id).order_by(Outfit.timestamp.desc()).all()
+
+    # return serialized outfits
+    return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
+
+
+@app.route("/users/<int:user_id>/likes/", methods=["GET"])
+def get_liked_outfits_by_user_id(user_id):
+    # get user by id
+    user = User.query.filter_by(id=user_id).first()
+
+    # check if user exists
+    if user is None:
+        return failure_response("User not found")
+
+    # get outfits this user has liked
+    outfits = [like.outfit for like in user.likes]
+
+    # return serialized liked outfits
+    return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
