@@ -5,7 +5,7 @@ from flask import Flask, request
 from datetime import datetime
 
 # define db filename
-db_filename = "todo.db"
+db_filename = "befit.db"
 app = Flask(__name__)
 
 # setup config
