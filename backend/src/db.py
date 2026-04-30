@@ -184,6 +184,63 @@ class OutfitCombination(db.Model):
             "timestamp": self.timestamp.isoformat(),
             "items": [item.serialize() for item in self.items]
         }
+    
+class BorrowRequest(db.Model):
+    __tablename__ = "borrow_requests"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    title = db.Column(db.String, nullable=False)        # for example "Need a black dress for chorale"
+    description = db.Column(db.String, nullable=True)   # for example: "Need it to be ALL black"
+    category = db.Column(db.String, nullable=True)      # "top", "bottom", "shoes" etc.
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", backref=db.backref("borrow_requests", cascade="all, delete-orphan"))
+    offers = db.relationship("BorrowOffer", backref="request", cascade="all, delete-orphan")
+
+    def __init__(self, **kwargs):
+        self.user_id = kwargs.get("user_id")
+        self.title = kwargs.get("title")
+        self.description = kwargs.get("description", "")
+        self.category = kwargs.get("category", "")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user": self.user.simple_serialize(),
+            "title": self.title,
+            "description": self.description,
+            "category": self.category,
+            "timestamp": self.timestamp.isoformat(),
+            "offers": [o.serialize() for o in self.offers]
+        }
+
+
+class BorrowOffer(db.Model):
+    __tablename__ = "borrow_offers"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    request_id = db.Column(db.Integer, db.ForeignKey("borrow_requests.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    image_url = db.Column(db.String, nullable=True)     # photo of the item they're offering
+    message = db.Column(db.String, nullable=True)       # for example: "I have a black dress, size S!"
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", backref=db.backref("borrow_offers", cascade="all, delete-orphan"))
+
+    def __init__(self, **kwargs):
+        self.request_id = kwargs.get("request_id")
+        self.user_id = kwargs.get("user_id")
+        self.image_url = kwargs.get("image_url", "")
+        self.message = kwargs.get("message", "")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "request_id": self.request_id,
+            "user": self.user.simple_serialize(),
+            "image_url": self.image_url,
+            "message": self.message,
+            "timestamp": self.timestamp.isoformat()
+        }
 
 
 

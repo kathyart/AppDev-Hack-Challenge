@@ -1,7 +1,7 @@
 import json
 import os
 
-from db import db, Outfit, User, Like, ClothingItem, OutfitCombination
+from db import db, Outfit, User, Like, ClothingItem, OutfitCombination, BorrowRequest, BorrowOffer
 from flask import Flask, request, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
@@ -550,6 +550,107 @@ def delete_combination(combination_id):
     db.session.delete(combo)
     db.session.commit()
     return success_response(combo.serialize())
+
+# ------------------------------------
+# BORROW ROUTES (6)
+# ------------------------------------
+
+# Create a borrow request
+@app.route("/borrow/", methods=["POST"])
+def create_borrow_request():
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    user_id = body.get("user_id")
+    title = body.get("title")
+
+    if not user_id or not title:
+        return failure_response("Missing required fields: user_id and title", 400)
+
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    borrow_request = BorrowRequest(
+        user_id=user_id,
+        title=title,
+        description=body.get("description", ""),
+        category=body.get("category", "")
+    )
+    db.session.add(borrow_request)
+    db.session.commit()
+    return success_response(borrow_request.serialize(), 201)
+
+
+# Get all borrow requests
+@app.route("/borrow/", methods=["GET"])
+def get_all_borrow_requests():
+    requests = BorrowRequest.query.order_by(BorrowRequest.timestamp.desc()).all()
+    return success_response({"borrow_requests": [r.serialize() for r in requests]})
+
+
+# Get one borrow request with all its offers
+@app.route("/borrow/<int:request_id>/", methods=["GET"])
+def get_borrow_request(request_id):
+    borrow_request = BorrowRequest.query.filter_by(id=request_id).first()
+    if borrow_request is None:
+        return failure_response("Borrow request not found")
+    return success_response(borrow_request.serialize())
+
+
+# Delete a borrow request
+@app.route("/borrow/<int:request_id>/", methods=["DELETE"])
+def delete_borrow_request(request_id):
+    borrow_request = BorrowRequest.query.filter_by(id=request_id).first()
+    if borrow_request is None:
+        return failure_response("Borrow request not found")
+
+    db.session.delete(borrow_request)
+    db.session.commit()
+    return success_response(borrow_request.serialize())
+
+
+# Offer to fulfill a borrow request
+@app.route("/borrow/<int:request_id>/offers/", methods=["POST"])
+def create_borrow_offer(request_id):
+    borrow_request = BorrowRequest.query.filter_by(id=request_id).first()
+    if borrow_request is None:
+        return failure_response("Borrow request not found")
+
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    user_id = body.get("user_id")
+    if not user_id:
+        return failure_response("Missing required field: user_id", 400)
+
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    offer = BorrowOffer(
+        request_id=request_id,
+        user_id=user_id,
+        image_url=body.get("image_url", ""),
+        message=body.get("message", "")
+    )
+    db.session.add(offer)
+    db.session.commit()
+    return success_response(offer.serialize(), 201)
+
+
+# Delete a borrow offer
+@app.route("/offers/<int:offer_id>/", methods=["DELETE"])
+def delete_borrow_offer(offer_id):
+    offer = BorrowOffer.query.filter_by(id=offer_id).first()
+    if offer is None:
+        return failure_response("Offer not found")
+
+    db.session.delete(offer)
+    db.session.commit()
+    return success_response(offer.serialize())
 
 
 if __name__ == "__main__":
