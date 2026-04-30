@@ -1,7 +1,9 @@
 import json
+import os
 
 from db import db, Outfit, User, Like
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
+from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
 
 # define db filename
@@ -18,6 +20,15 @@ db.init_app(app)
 with app.app_context():
     db.create_all()
 
+# local folder for uploaded images
+UPLOAD_FOLDER = "uploads"
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg"}
+
+app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
 
 # generalized response formats
 def success_response(data, code=200):
@@ -27,6 +38,9 @@ def success_response(data, code=200):
 def failure_response(message, code=404):
     return json.dumps({"error": message}), code
 
+
+def allowed_file(filename):
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 ## OUTFIT ROUTES (8)
@@ -367,6 +381,65 @@ def get_leaderboard():
     return success_response(
         {"leaderboard": [outfit.serialize() for outfit in top_outfits]}
     )
+
+
+## AUTH ROUTES (1)
+# Login with netid only (no password)
+@app.route("/login/", methods=["POST"])
+def login():
+    # get request body
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    netid = body.get("netid")
+    if not netid:
+        return failure_response("Missing required field: netid", 400)
+
+    # find user by netid
+    user = User.query.filter_by(netid=netid).first()
+    if user is None:
+        return failure_response("User not found", 404)
+
+    return success_response(
+        {"message": "Login successful", "user": user.serialize()}
+    )
+
+
+## UPLOAD ROUTES (2)
+# Serve a file from the uploads folder
+@app.route("/uploads/<string:filename>/", methods=["GET"])
+def serve_upload(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
+# Upload an image file; returns image_url for use with POST /outfits/
+@app.route("/upload/", methods=["POST"])
+def upload_image():
+    # check that an image file was sent
+    if "image" not in request.files:
+        return failure_response("No image file provided", 400)
+
+    file = request.files["image"]
+
+    # check that user selected a file
+    if file.filename is None or file.filename == "":
+        return failure_response("No selected file", 400)
+
+    # check file extension
+    if not allowed_file(file.filename):
+        return failure_response("Invalid file type. Use png, jpg, or jpeg", 400)
+
+    # save with a safe filename
+    safe_name = secure_filename(file.filename)
+    upload_path = os.path.join(app.config["UPLOAD_FOLDER"], safe_name)
+    file.save(upload_path)
+
+    # URL the frontend can use (same host as the API)
+    image_url = f"/uploads/{safe_name}/"
+
+    return success_response({"image_url": image_url}, 201)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
