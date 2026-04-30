@@ -121,12 +121,9 @@ def delete_outfit(outfit_id):
     db.session.commit()
     return success_response(outfit.serialize())
 
-    
 
-
-
-
-
+## USER ROUTES (5)
+# GET all users
 @app.route("/users/", methods=["GET"])
 def get_all_users():
     # get all users
@@ -135,7 +132,7 @@ def get_all_users():
     # return serialized users
     return success_response({"users": [user.serialize() for user in users]})
 
-
+# GET one specfic user
 @app.route("/users/<int:user_id>/", methods=["GET"])
 def get_user_by_user_id(user_id):
     # get user by id
@@ -149,6 +146,7 @@ def get_user_by_user_id(user_id):
     return success_response(user.serialize())
 
 
+# Create a new user
 @app.route("/users/", methods=["POST"])
 def create_user():
     # get request body
@@ -179,6 +177,7 @@ def create_user():
     return success_response(new_user.serialize(), 201)
 
 
+# GET all outfits from a specific user
 @app.route("/users/<int:user_id>/outfits/", methods=["GET"])
 def get_outfits_by_user_id(user_id):
     # get user by id
@@ -195,6 +194,7 @@ def get_outfits_by_user_id(user_id):
     return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
 
 
+# GET all outfits a specfic user liked
 @app.route("/users/<int:user_id>/likes/", methods=["GET"])
 def get_liked_outfits_by_user_id(user_id):
     # get user by id
@@ -210,6 +210,91 @@ def get_liked_outfits_by_user_id(user_id):
     # return serialized liked outfits
     return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
 
+## LIKE ROUTES
+# Like an Outfit
+@app.route("/likes/", methods=["POST"])
+def create_like():
+    # get request body
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
 
+    user_id = body.get("user_id")
+    outfit_id = body.get("outfit_id")
+
+    # check if user_id and outfit_id are provided
+    if user_id is None or outfit_id is None:
+        return failure_response("Missing required fields: user_id and outfit_id", 400)
+
+    # check if user exists
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    # check if outfit exists
+    outfit = Outfit.query.filter_by(id=outfit_id).first()
+    if outfit is None:
+        return failure_response("Outfit not found")
+
+    # check if the user has already liked this outfit
+    existing_like = Like.query.filter_by(user_id=user_id, outfit_id=outfit_id).first()
+    if existing_like is not None:
+        return failure_response("User has already liked this outfit", 400)
+
+    # create new like
+    new_like = Like(user_id=user_id, outfit_id=outfit_id)
+    db.session.add(new_like)
+    db.session.commit()
+
+    # return created like
+    return success_response(new_like.serialize(), 201)
+
+# Unlike an Outfit
+@app.route("/likes/", methods=["DELETE"])
+def delete_like():
+    # get request body
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    user_id = body.get("user_id")
+    outfit_id = body.get("outfit_id")
+
+    # check if user_id and outfit_id are provided
+    if user_id is None or outfit_id is None:
+        return failure_response("Missing required fields: user_id and outfit_id", 400)
+
+    # find the like using user_id and outfit_id
+    like = Like.query.filter_by(user_id=user_id, outfit_id=outfit_id).first()
+    if like is None:
+        return failure_response("Like not found")
+
+    # delete like
+    serialized = like.serialize()
+    db.session.delete(like)
+    db.session.commit()
+
+    # return success response
+    return success_response(serialized)
+
+# View like counts
+@app.route("/outfits/<int:outfit_id>/likes/", methods=["GET"])
+def get_likes_for_outfit(outfit_id):
+    # check if outfit exists
+    outfit = Outfit.query.filter_by(id=outfit_id).first()
+    if outfit is None:
+        return failure_response("Outfit not found")
+
+    # get all Like objects for this outfit
+    likes = Like.query.filter_by(outfit_id=outfit_id).all()
+
+    # return serialized likes and count
+    return success_response(
+        {
+            "likes": [like.serialize() for like in likes],
+            "count": len(likes),
+        }
+    )
+    
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
