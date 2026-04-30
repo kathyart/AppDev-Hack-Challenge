@@ -53,7 +53,6 @@ class User(db.Model):
         self.bio = kwargs.get("bio", "")
         self.netid = kwargs.get("netid", "")
 
-
     def serialize(self):
         """
         Serializes an User object
@@ -129,7 +128,62 @@ class Outfit(db.Model):
             "timestamp": self.timestamp.isoformat()
         }
     
+# Join table: many-to-many between OutfitCombination and ClothingItem
+combination_items = db.Table(
+    "combination_items",
+    db.Column("combination_id", db.Integer, db.ForeignKey("outfit_combinations.id"), primary_key=True),
+    db.Column("item_id", db.Integer, db.ForeignKey("clothing_items.id"), primary_key=True)
+)
 
+class ClothingItem(db.Model):
+    __tablename__ = "clothing_items"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    image_url = db.Column(db.String, nullable=False)
+    category = db.Column(db.String, nullable=False)  # "top", "bottom", "shoes", "outerwear", "accessory"
+    name = db.Column(db.String, nullable=True)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", backref=db.backref("closet_items", cascade="all, delete-orphan"))
+
+    def __init__(self, **kwargs):
+        self.user_id = kwargs.get("user_id")
+        self.image_url = kwargs.get("image_url")
+        self.category = kwargs.get("category")
+        self.name = kwargs.get("name", "")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "image_url": self.image_url,
+            "category": self.category,
+            "name": self.name,
+            "timestamp": self.timestamp.isoformat()
+        }
+
+class OutfitCombination(db.Model):
+    __tablename__ = "outfit_combinations"
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    name = db.Column(db.String, nullable=True)
+    timestamp = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    user = db.relationship("User", backref=db.backref("combinations", cascade="all, delete-orphan"))
+    items = db.relationship("ClothingItem", secondary=combination_items, backref="combinations")
+
+    def __init__(self, **kwargs):
+        self.user_id = kwargs.get("user_id")
+        self.name = kwargs.get("name", "")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "name": self.name,
+            "timestamp": self.timestamp.isoformat(),
+            "items": [item.serialize() for item in self.items]
+        }
 
 
 

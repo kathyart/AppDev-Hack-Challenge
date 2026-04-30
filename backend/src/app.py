@@ -1,7 +1,7 @@
 import json
 import os
 
-from db import db, Outfit, User, Like
+from db import db, Outfit, User, Like, ClothingItem, OutfitCombination
 from flask import Flask, request, send_from_directory
 from werkzeug.utils import secure_filename
 from datetime import datetime, timezone, timedelta
@@ -43,7 +43,10 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-## OUTFIT ROUTES (8)
+#------------------------------------------------
+# OUTFIT ROUTES (8)
+# -----------------------------------------------
+
 # Get all outfits
 @app.route("/outfits/", methods=["GET"])
 def get_all_outfits():
@@ -185,8 +188,10 @@ def delete_outfit(outfit_id):
     db.session.commit()
     return success_response(outfit.serialize())
 
+#------------------------------------------------
+# USER ROUTES (5)
+# -----------------------------------------------
 
-## USER ROUTES (5)
 # GET all users
 @app.route("/users/", methods=["GET"])
 def get_all_users():
@@ -208,7 +213,6 @@ def get_user_by_user_id(user_id):
 
     # return serialized user
     return success_response(user.serialize())
-
 
 # Create a new user
 @app.route("/users/", methods=["POST"])
@@ -240,7 +244,6 @@ def create_user():
     # return created user
     return success_response(new_user.serialize(), 201)
 
-
 # GET all outfits from a specific user
 @app.route("/users/<int:user_id>/outfits/", methods=["GET"])
 def get_outfits_by_user_id(user_id):
@@ -256,7 +259,6 @@ def get_outfits_by_user_id(user_id):
 
     # return serialized outfits
     return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
-
 
 # GET all outfits a specfic user liked
 @app.route("/users/<int:user_id>/likes/", methods=["GET"])
@@ -274,7 +276,10 @@ def get_liked_outfits_by_user_id(user_id):
     # return serialized liked outfits
     return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
 
-## LIKE ROUTES (3)
+#------------------------------------------------
+# LIKE ROUTES (3)
+# -----------------------------------------------
+
 # Like an Outfit
 @app.route("/likes/", methods=["POST"])
 def create_like():
@@ -439,6 +444,112 @@ def upload_image():
     image_url = f"/uploads/{safe_name}/"
 
     return success_response({"image_url": image_url}, 201)
+
+# ---------------------------------
+#  CLOSET ROUTES (3)
+# ------------------------------------
+
+# Add a clothing item to closet
+@app.route("/users/<int:user_id>/closet/", methods=["POST"])
+def add_clothing_item(user_id):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    image_url = body.get("image_url")
+    category = body.get("category")
+
+    if not image_url or not category:
+        return failure_response("Missing required fields: image_url and category", 400)
+
+    VALID_CATEGORIES = {"top", "bottom", "shoes", "outerwear", "accessory"}
+    if category not in VALID_CATEGORIES:
+        return failure_response(f"Invalid category. Choose from: {', '.join(VALID_CATEGORIES)}", 400)
+
+    item = ClothingItem(user_id=user_id, image_url=image_url, category=category, name=body.get("name", ""))
+    db.session.add(item)
+    db.session.commit()
+    return success_response(item.serialize(), 201)
+
+
+# Get all clothing items in a user's closet
+@app.route("/users/<int:user_id>/closet/", methods=["GET"])
+def get_closet(user_id):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    items = ClothingItem.query.filter_by(user_id=user_id).all()
+    return success_response({"items": [item.serialize() for item in items]})
+
+
+# Delete a clothing item
+@app.route("/closet/<int:item_id>/", methods=["DELETE"])
+def delete_clothing_item(item_id):
+    item = ClothingItem.query.filter_by(id=item_id).first()
+    if item is None:
+        return failure_response("Clothing item not found")
+
+    db.session.delete(item)
+    db.session.commit()
+    return success_response(item.serialize())
+
+
+# --------------------------------------
+# OUTFIT COMBINATION ROUTES (3)
+# --------------------------------------
+
+# Save a new outfit combination
+@app.route("/users/<int:user_id>/combinations/", methods=["POST"])
+def create_combination(user_id):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    body = request.json
+    if body is None:
+        return failure_response("Invalid request body", 400)
+
+    item_ids = body.get("item_ids")  # list of ClothingItem IDs
+    if not item_ids or not isinstance(item_ids, list):
+        return failure_response("Missing required field: item_ids (must be a list)", 400)
+
+    items = ClothingItem.query.filter(ClothingItem.id.in_(item_ids)).all()
+    if len(items) != len(item_ids):
+        return failure_response("One or more clothing items not found", 404)
+
+    combo = OutfitCombination(user_id=user_id, name=body.get("name", ""))
+    combo.items = items
+    db.session.add(combo)
+    db.session.commit()
+    return success_response(combo.serialize(), 201)
+
+
+# Get all saved combinations for a user
+@app.route("/users/<int:user_id>/combinations/", methods=["GET"])
+def get_combinations(user_id):
+    user = User.query.filter_by(id=user_id).first()
+    if user is None:
+        return failure_response("User not found")
+
+    combos = OutfitCombination.query.filter_by(user_id=user_id).all()
+    return success_response({"combinations": [c.serialize() for c in combos]})
+
+
+# Delete a combination
+@app.route("/combinations/<int:combination_id>/", methods=["DELETE"])
+def delete_combination(combination_id):
+    combo = OutfitCombination.query.filter_by(id=combination_id).first()
+    if combo is None:
+        return failure_response("Combination not found")
+
+    db.session.delete(combo)
+    db.session.commit()
+    return success_response(combo.serialize())
 
 
 if __name__ == "__main__":
