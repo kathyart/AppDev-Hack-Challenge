@@ -29,13 +29,14 @@ def failure_response(message, code=404):
 
 
 
-# outfits endpoints
+## OUTFIT ROUTES (6)
+# Get all outfits
 @app.route("/outfits/", methods=["GET"])
 def get_all_outfits():
     outfits = Outfit.query.all()
     return success_response({"outfits": [o.serialize() for o in outfits]})
 
-
+# Get one outfit
 @app.route("/outfits/<int:outfit_id>/", methods=["GET"])
 def get_outfit_by_outfit_id(outfit_id):
     outfit = Outfit.query.filter_by(id=outfit_id).first()
@@ -43,7 +44,7 @@ def get_outfit_by_outfit_id(outfit_id):
         return failure_response("Outfit not found")
     return success_response(outfit.serialize())
 
-
+# Get outfits by date
 @app.route("/outfits/date/<string:date>/", methods=["GET"])
 def get_outfits_by_date(date):
     # the format of the date should be YYYY-MM-DD, for example: /outfits/date/2025-04-29/
@@ -58,7 +59,7 @@ def get_outfits_by_date(date):
         return failure_response("No outfits found for this date")
     return success_response({"outfits": [o.serialize() for o in outfits]})
 
-
+# Create an outfit
 @app.route("/outfits/", methods=["POST"])
 def create_outfit():
     body = request.json
@@ -87,7 +88,7 @@ def create_outfit():
     db.session.commit()
     return success_response(new_outfit.serialize(), 201)
 
-
+# Update an outfit
 @app.route("/outfits/<int:outfit_id>/", methods=["POST"])
 def update_outfit(outfit_id):
     outfit = Outfit.query.filter_by(id=outfit_id).first()
@@ -110,7 +111,7 @@ def update_outfit(outfit_id):
     db.session.commit()
     return success_response(outfit.serialize())
 
-
+# Delete an outfit
 @app.route("/outfits/<int:outfit_id>/", methods=["DELETE"])
 def delete_outfit(outfit_id):
     outfit = Outfit.query.filter_by(id=outfit_id).first()
@@ -210,7 +211,7 @@ def get_liked_outfits_by_user_id(user_id):
     # return serialized liked outfits
     return success_response({"outfits": [outfit.serialize() for outfit in outfits]})
 
-## LIKE ROUTES
+## LIKE ROUTES (3)
 # Like an Outfit
 @app.route("/likes/", methods=["POST"])
 def create_like():
@@ -295,6 +296,6 @@ def get_likes_for_outfit(outfit_id):
             "count": len(likes),
         }
     )
-    
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
