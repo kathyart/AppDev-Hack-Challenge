@@ -297,5 +297,23 @@ def get_likes_for_outfit(outfit_id):
         }
     )
 
+## LEADERBOARD ROUTES (1)
+# Show the 6 most like outfits
+@app.route("/leaderboard/", methods=["GET"])
+def get_leaderboard():
+    # get all outfits
+    outfits = Outfit.query.all()
+
+    # sort outfits by likes (highest to lowest)
+    sorted_outfits = sorted(outfits, key=lambda o: len(o.likes), reverse=True)
+
+    # take top 6
+    top_outfits = sorted_outfits[:6]
+
+    # return response
+    return success_response(
+        {"leaderboard": [outfit.serialize() for outfit in top_outfits]}
+    )
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
