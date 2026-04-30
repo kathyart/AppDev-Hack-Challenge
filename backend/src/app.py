@@ -2,7 +2,7 @@ import json
 
 from db import db, Outfit, User, Like
 from flask import Flask, request
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 
 # define db filename
 db_filename = "befit.db"
@@ -29,7 +29,7 @@ def failure_response(message, code=404):
 
 
 
-## OUTFIT ROUTES (6)
+## OUTFIT ROUTES (8)
 # Get all outfits
 @app.route("/outfits/", methods=["GET"])
 def get_all_outfits():
@@ -59,6 +59,46 @@ def get_outfits_by_date(date):
         return failure_response("No outfits found for this date")
     return success_response({"outfits": [o.serialize() for o in outfits]})
 
+
+# Get outfits by weather (case-insensitive, partial match)
+@app.route("/outfits/weather/<string:weather>/", methods=["GET"])
+def get_outfits_by_weather(weather):
+    # search outfits where weather matches (ilike)
+    outfits = Outfit.query.filter(Outfit.weather.ilike(f"%{weather}%")).all()
+
+    if not outfits:
+        return failure_response("No outfits found for this weather")
+    return success_response({"outfits": [o.serialize() for o in outfits]})
+
+
+# Get outfits by temperature range (query params: min, max)
+@app.route("/outfits/temperature/", methods=["GET"])
+def get_outfits_by_temperature_range():
+    # read min and max from query string
+    min_raw = request.args.get("min")
+    max_raw = request.args.get("max")
+
+    if min_raw is None or max_raw is None:
+        return failure_response("Missing required query parameters: min and max", 400)
+
+    # convert to floats
+    try:
+        min_temp = float(min_raw)
+        max_temp = float(max_raw)
+    except ValueError:
+        return failure_response("Temperature values must be numbers", 400)
+
+    # outfits with temperature between min and max (inclusive)
+    outfits = Outfit.query.filter(
+        Outfit.temperature >= min_temp,
+        Outfit.temperature <= max_temp,
+    ).all()
+
+    if not outfits:
+        return failure_response("No outfits found in this temperature range")
+    return success_response({"outfits": [o.serialize() for o in outfits]})
+
+
 # Create an outfit
 @app.route("/outfits/", methods=["POST"])
 def create_outfit():
@@ -76,6 +116,15 @@ def create_outfit():
     user = User.query.filter_by(id=user_id).first()
     if user is None:
         return failure_response("User not found")
+
+    # one outfit per user per day (compare date in UTC)
+    today_utc = datetime.now(timezone.utc).date()
+    already_posted_today = Outfit.query.filter(
+        Outfit.user_id == user_id,
+        db.func.date(Outfit.timestamp) == today_utc,
+    ).first()
+    if already_posted_today is not None:
+        return failure_response("User has already posted an outfit today", 400)
 
     new_outfit = Outfit(
         image_url=image_url,
@@ -298,11 +347,15 @@ def get_likes_for_outfit(outfit_id):
     )
 
 ## LEADERBOARD ROUTES (1)
-# Show the 6 most like outfits
+# Weekly leaderboard (top 6 outfits by likes in the last 7 days)
 @app.route("/leaderboard/", methods=["GET"])
 def get_leaderboard():
-    # get all outfits
-    outfits = Outfit.query.all()
+    # get current UTC time and start of weekly window
+    now_utc = datetime.now(timezone.utc)
+    one_week_ago = now_utc - timedelta(days=7)
+
+    # only outfits posted in the last week
+    outfits = Outfit.query.filter(Outfit.timestamp >= one_week_ago).all()
 
     # sort outfits by likes (highest to lowest)
     sorted_outfits = sorted(outfits, key=lambda o: len(o.likes), reverse=True)
