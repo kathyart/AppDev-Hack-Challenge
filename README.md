@@ -12,6 +12,6 @@ How app addresses Backend requirements:
     * Outfit Combinations -> Closet Items: Many-to-Many - A saved outfit combination can include multiple closet items, and a closet item can appear in multiple combinations.
 * API Specification explaining each implemented route (4+): https://docs.google.com/document/d/113-dFCJcfBlNniF1WQA9KFsGr6zpnr5EL_td1w62mHA/edit?usp=sharing  
 
-(Midpoint explanation of database & API design: <img width="700" height="600" alt="Screenshot 2026-04-26 203700" src="https://github.com/user-attachments/assets/5d8f96bd-cc76-40af-ac84-60367acee890" />
+(Midpoint explanation of database & API design: <img width="300" height="100" alt="Screenshot 2026-04-26 203700" src="https://github.com/user-attachments/assets/5d8f96bd-cc76-40af-ac84-60367acee890" />)
 
 
