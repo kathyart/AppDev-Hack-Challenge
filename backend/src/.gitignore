@@ -1,0 +1,6 @@
+__pycache__/
+venv/
+uploads/
+uploads/*
+instance/*
+!instance/befit.db
