@@ -1,6 +1,6 @@
 BeFit!: A daily outfit-sharing app for Cornell students!
 
-Andorid Repo: https://github.com/ashley-ong/BeFit 
+Android Repo: https://github.com/ashley-ong/BeFitFinal
 
 App Description:
 BeFit is a social platform in which students can share their daily outfits each morning. Users can post their ourfits, browse what others are wearing depending on the weather, and interact with posts through likes. The app also features a leaderboard of the most-liked fits, giving students inspiration and helping them decide what to wear!
